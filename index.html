@@ -526,8 +526,13 @@
 }
 
         function entrarAdmin() {
-            if(document.getElementById('u').value === 'mathias' && document.getElementById('p').value === 'zonaburger122') { 
-                renderVentas(); navegar('admin'); 
+            const user = document.getElementById('u').value;
+            const pass = document.getElementById('p').value;
+
+            if(user === 'mathias' && pass === 'zonaburger122') { 
+                renderVentas(); 
+                navegar('admin'); 
+                notificar("Acceso concedido", "success");
             } else {
                 notificar("Acceso denegado");
             }
