@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zona Burger | Gestión Total</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        
+        :root { 
+            --rojo: #ef4444; 
+            --negro: #050505; 
+            --gris-oscuro: #121212; 
+        }
+        
+        body { background: var(--negro); color: white; font-family: 'Inter', sans-serif; height: 100vh; overflow-x: hidden; }
+        
+        .view { display: none !important; }
+        .view.active { display: block !important; }
+        
+        #view-login, #view-admin, #view-cart, #options-drawer { 
+            position: fixed; inset: 0; z-index: 1000; background: var(--negro); 
+        }
+
+        #options-drawer { 
+            left: auto; right: -100%; width: 100%; max-width: 450px; 
+            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); 
+            border-left: 1px solid #222; 
+            display: flex !important; flex-direction: column;
+        }
+        #options-drawer.show { right: 0; }
+
+        .burger-card { background: var(--gris-oscuro); border: 1px solid #222; border-radius: 20px; padding: 20px; cursor: pointer; transition: 0.2s; }
+        .burger-card:hover { border-color: var(--rojo); }
+        
+        input, select, textarea { background: #1a1a1a !important; color: white !important; border: 1px solid #333 !important; }
+        
+        .cat-title { 
+            color: var(--rojo); 
+            font-weight: 900; 
+            font-style: italic; 
+            text-transform: uppercase; 
+            font-size: 0.8rem; 
+            margin-top: 2rem; 
+            margin-bottom: 1rem; 
+            border-left: 4px solid var(--rojo); 
+            padding-left: 10px; 
+        }
+
+        .remove-chip input:checked + span { background-color: var(--rojo); color: white; border-color: var(--rojo); }
+        .extra-item:has(input:checked) { border-color: var(--rojo); background-color: rgba(239, 68, 68, 0.1); }
+
+        .drawer-footer {
+            padding: 20px;
+            background: linear-gradient(to top, var(--negro) 80%, transparent);
+            border-top: 1px solid rgba(255,255,255,0.05);
+        }
+
+        /* Estilos para las alertas nuevas */
+        .toast-active { transform: translateY(0) !important; opacity: 1 !important; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #ticket-imprimir, #ticket-imprimir * { visibility: visible; }
+            #ticket-imprimir { position: absolute; left: 0; top: 0; width: 100%; color: black; background: white; padding: 0; margin: 0; font-family: monospace; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toast-container" class="fixed top-6 left-1/2 -translate-x-1/2 z-[3000] flex flex-col gap-2 w-full max-w-xs px-4 pointer-events-none"></div>
+
+    <div id="custom-confirm" class="fixed inset-0 z-[4000] bg-black/80 backdrop-blur-sm hidden items-center justify-center p-6">
+        <div class="bg-zinc-900 border border-white/10 p-6 rounded-[30px] w-full max-w-xs text-center shadow-2xl">
+            <div class="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fas fa-exclamation-triangle text-2xl"></i>
+            </div>
+            <h3 class="font-black uppercase italic text-white mb-2">¿Confirmar acción?</h3>
+            <p id="confirm-msg" class="text-zinc-400 text-sm mb-6"></p>
+            <div class="flex gap-3">
+                <button onclick="closeConfirm(false)" class="flex-1 py-3 rounded-xl bg-zinc-800 text-[10px] font-bold uppercase tracking-widest">No</button>
+                <button onclick="closeConfirm(true)" class="flex-1 py-3 rounded-xl bg-red-500 text-[10px] font-bold uppercase tracking-widest">Sí, seguir</button>
+            </div>
+        </div>
+    </div>
+
+    <nav id="main-nav" class="fixed top-0 w-full z-[50] bg-black/90 p-4 border-b border-white/10">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <h1 class="font-black italic text-xl cursor-pointer" onclick="navegar('home')">ZONA<span class="text-red-500">BURGER</span></h1>
+            <div class="flex gap-4 text-[10px] font-bold uppercase">
+                <button onclick="navegar('home')" class="hover:text-red-600 transition-colors duration-300 font-bold uppercase tracking-widest text-zinc-400">INICIO</button>
+                <button onclick="navegar('pedido')" class="hover:text-red-600 transition-colors duration-300 font-bold uppercase tracking-widest text-zinc-400">MENÚ</button>
+            </div>
+        </div>
+    </nav>
+
+    <section id="view-home" class="view active pt-20 text-center px-4">
+        <div class="hero-background w-full max-w-3xl mx-auto rounded-[40px] overflow-hidden bg-cover border border-white/10 shadow-2xl relative" 
+            style="background-image: linear-gradient(to bottom, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0.6) 60%, #050505 100%), url('hamburguesa.jpeg'); 
+                    background-position: center 80%;">
+            <div class="py-20 px-6">
+                <h2 class="text-5xl md:text-6xl font-black italic mb-4 uppercase text-white drop-shadow-2xl">EL SABOR QUE BUSCAS</h2>
+                <p class="text-zinc-200 text-lg mb-8 font-medium drop-shadow-md">La calidad que te mereces.</p>
+                <button id="btn-hacer-pedido-home" onclick="navegar('pedido')" class="bg-red-500 text-white px-10 py-4 rounded-full font-black uppercase text-xs shadow-xl hover:bg-red-600 transition-all transform hover:scale-105">
+                    Hacer Pedido
+                </button>
+            </div>
+        </div>
+
+        <div class="max-w-3xl mx-auto mt-6 mb-20 px-6 py-12 bg-zinc-900/50 rounded-[40px] border border-white/5 text-left">
+            <div class="max-w-xl mx-auto">
+                <h3 class="text-red-500 font-black italic uppercase text-2xl mb-4 text-center md:text-left">Sobre Nosotros</h3>
+                <p class="text-zinc-300 text-sm leading-relaxed mb-10 text-align: justify-center md:text-left">
+                    En <span class="text-white font-bold">ZONA BURGER</span>, Nacimos en 2024 como un emprendimiento <span class="text-white font-bold"> 100% delivery </span>, convencidos de que la mejor hamburguesa no se disfruta en un restaurante, sino en la comodidad de tu casa. </p>
+                <h6 class="text-red-500 font-black italic uppercase text-2xl mb-4 text-center md:text-left">Nuestra misión</h6>    
+                    <p class="text-zinc-300 text-sm leading-relaxed mb-10 text-align: justify-center md:text-left">Proporcionar la mejor calidad de comida rápida en el menor tiempo posible, garantizando una experiencia de sabor premium directa a tu puerta.</p>
+                    <p class="text-zinc-300 text-sm leading-relaxed mb-10 text-align: justify-center md:text-left">Al no tener atención al público en local, enfocamos todos nuestros recursos en perfeccionar dos cosas:<span class="text-white font-bold"> ingredientes de primera </span> y una <span class="text-white font-bold"> logística impecable</span>. En Zona Burger, el compromiso es que tu pedido llegue siempre caliente, perfecto y a tiempo.</p>
+                    <p class="text-zinc-300 text-sm leading-relaxed mb-10 text-align: justify-center md:text-left">Al elegirnos, eliges un emprendimiento que cuida el detalle, desde la elección de la carne hasta el empaque térmico que protege tu cena.</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-black/40 p-5 rounded-2xl border border-white/10 shadow-xl">
+                        <h4 class="text-white font-black uppercase text-[10px] mb-4 flex items-center gap-2">
+                            <i class="fas fa-clock text-red-500"></i> Horarios de Atención
+                        </h4>
+                        <ul class="text-zinc-400 text-[11px] space-y-2">
+                            <li class="flex justify-between"><span>Lunes a Jueves</span> <span class="text-red-500/50 italic font-bold">CERRADO</span></li>
+                            <li class="flex justify-between text-zinc-200"><span>Viernes</span> <span>20:00 a 00:00</span></li>
+                            <li class="flex justify-between text-zinc-200"><span>Sábado</span> <span>20:00 a 00:00</span></li>
+                            <li class="flex justify-between text-zinc-200"><span>Domingo</span> <span>20:00 a 00:00</span></li>
+                        </ul>
+                    </div>
+                    <div class="bg-black/40 p-5 rounded-2xl border border-white/10 shadow-xl">
+                        <h4 class="text-white font-black uppercase text-[10px] mb-4 flex items-center gap-2">
+                            <i class="fas fa-motorcycle text-red-500"></i> Zonas de Entrega
+                        </h4>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="bg-zinc-800 px-2 py-1 rounded text-[9px] font-bold text-zinc-300 uppercase">Pirelli</span>
+                            <span class="bg-zinc-800 px-2 py-1 rounded text-[9px] font-bold text-zinc-300 uppercase">Los perales</span>
+                            <span class="bg-zinc-800 px-2 py-1 rounded text-[9px] font-bold text-zinc-300 uppercase">La oculta</span>
+                            <span class="bg-zinc-800 px-2 py-1 rounded text-[9px] font-bold text-zinc-300 uppercase">PiedraBuena</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <footer class="mt-10 pb-12 text-center">
+            <div class="flex justify-center items-center gap-6 mb-8">
+                <a href="https://www.instagram.com/zonaburgerrr/ target="_blank" class="text-zinc-500 hover:text-red-500 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+                    <i class="fab fa-instagram text-lg"></i> Instagram
+                </a>
+                <span class="w-1 h-1 bg-zinc-800 rounded-full"></span>
+                <a href="https://wa.me/1152617656" target="_blank" class="text-zinc-500 hover:text-green-500 transition-colors flex items-center gap-2 text-xs font-bold uppercase tracking-widest">
+                    <i class="fab fa-whatsapp text-lg"></i> Consultas
+                </a>
+            </div>
+
+            <div class="opacity-20 hover:opacity-100 transition-opacity">
+                <button onclick="navegar('login')" class="text-[9px] text-zinc-600 uppercase tracking-[3px] border border-white/5 px-4 py-2 rounded-full hover:bg-white/5 transition-all">
+                    Acceso Staff
+                </button>
+            </div>
+        </footer>
+    </section>
+
+    <section id="view-pedido" class="view pt-24 p-4 pb-32 overflow-y-auto h-screen">
+        <div class="max-w-xl mx-auto" id="lista-menu"></div>
+        <button id="btn-carrito-flotante" onclick="abrirCarrito()" class="fixed bottom-6 right-6 bg-red-500 text-white p-4 rounded-full shadow-2xl flex items-center gap-2 z-[60] scale-0 transition-transform">
+            <i class="fas fa-shopping-basket"></i>
+            <span id="total-flotante" class="font-bold">$0</span>
+        </button>
+    </section>
+
+    <div id="options-drawer">
+        <div class="p-6 flex justify-between items-center bg-black">
+            <h3 id="titulo-drawer" class="text-red-500 font-black uppercase italic text-xl leading-tight">Personalizar</h3>
+            <button onclick="cerrarDrawer()"><i class="fas fa-times text-xl"></i></button>
+        </div>
+        <div class="flex-1 overflow-y-auto px-6 space-y-6 pb-10">
+            <div class="flex items-center justify-between bg-zinc-900 p-4 rounded-2xl border border-white/10">
+                <p class="text-[10px] font-bold uppercase text-zinc-500">Cantidad</p>
+                <div class="flex items-center gap-6">
+                    <button onclick="cambiarCantidadDrawer(-1)" class="w-8 h-8 rounded-full border border-zinc-700 flex items-center justify-center">-</button>
+                    <span id="cant-drawer" class="font-black text-xl">1</span>
+                    <button onclick="cambiarCantidadDrawer(1)" class="w-8 h-8 rounded-full border border-red-500 text-red-500 flex items-center justify-center">+</button>
+                </div>
+            </div>
+            <div id="section-quitar" class="hidden">
+                <p class="text-[10px] font-bold uppercase text-zinc-500 mb-3">Quitar ingredientes</p>
+                <div id="lista-quitar" class="flex flex-wrap gap-2"></div>
+            </div>
+            <div id="section-bebida">
+                <p class="text-[10px] font-bold uppercase text-zinc-500 mb-3">Elegí tu Bebida</p>
+                <select id="sel-bebida" class="w-full p-3 rounded-xl outline-none">
+                    <option value="Coca Cola">Coca Cola</option>
+                    <option value="Sprite">7up</option>
+                    <option value="Agua">Agua</option>
+                </select>
+            </div>
+            <div id="section-salsa" class="mt-6">
+                <p class="text-[10px] font-bold uppercase text-zinc-500 mb-3">Elegí tu Salsa</p>
+                <select id="sel-salsa" class="w-full p-3 rounded-xl outline-none">
+                    <option value="Ketchup">Ketchup</option>
+                    <option value="Mayonesa">Mayonesa</option>
+                    <option value="Cheddar">Cheddar</option>
+                </select>
+            </div>
+            <div id="section-extras">
+                <p class="text-[10px] font-bold uppercase text-zinc-500 mb-3">Extras</p>
+                <div class="grid grid-cols-1 gap-2 text-sm" id="lista-extras-container">
+                    <label class="extra-item flex items-center justify-between bg-zinc-900 p-3 rounded-xl border border-white/5 cursor-pointer transition-all">
+                        <span class="flex items-center gap-2"><input type="checkbox" class="ex" value="Medallón de carne" data-p="3000" onchange="actualizarPrecioDrawer()"> Medallón de Carne</span> 
+                        <span class="text-red-500">+$3.000</span>
+                    </label>
+                    <label class="extra-item flex items-center justify-between bg-zinc-900 p-3 rounded-xl border border-white/5 cursor-pointer transition-all">
+                        <span class="flex items-center gap-2"><input type="checkbox" class="ex" value="Bacon" data-p="1500" onchange="actualizarPrecioDrawer()"> Bacon</span> 
+                        <span class="text-red-500">+$1.500</span>
+                    </label>
+                    <label class="extra-item flex items-center justify-between bg-zinc-900 p-3 rounded-xl border border-white/5 cursor-pointer transition-all">
+                        <span class="flex items-center gap-2"><input type="checkbox" class="ex" value="tomate" data-p="500" onchange="actualizarPrecioDrawer()"> Tomate</span> 
+                        <span class="text-red-500">+$500</span>
+                    </label>
+                    <label class="extra-item flex items-center justify-between bg-zinc-900 p-3 rounded-xl border border-white/5 cursor-pointer transition-all">
+                        <span class="flex items-center gap-2"><input type="checkbox" class="ex" value="Dip de ketchup" data-p="500" onchange="actualizarPrecioDrawer()"> Dip de kétchup</span> 
+                        <span class="text-red-500">+$500</span>
+                    </label>
+                    <label class="extra-item flex items-center justify-between bg-zinc-900 p-3 rounded-xl border border-white/5 cursor-pointer transition-all">
+                        <span class="flex items-center gap-2"><input type="checkbox" class="ex" value="Dip de mayonesa" data-p="500" onchange="actualizarPrecioDrawer()"> Dip de mayonesa</span> 
+                        <span class="text-red-500">+$500</span>
+                    </label>
+                    <label class="extra-item flex items-center justify-between bg-zinc-900 p-3 rounded-xl border border-white/5 cursor-pointer transition-all">
+                        <span class="flex items-center gap-2"><input type="checkbox" class="ex" value="Dip de cheddar" data-p="1000" onchange="actualizarPrecioDrawer()"> Dip de cheddar</span> 
+                        <span class="text-red-500">+1.000</span>
+                    </label>
+                    <label class="extra-item flex items-center justify-between bg-zinc-900 p-3 rounded-xl border border-white/5 cursor-pointer transition-all">
+                        <span class="flex items-center gap-2"><input type="checkbox" class="ex" value="agregado de cheddar y bacon en tus papas" data-p="2500" onchange="actualizarPrecioDrawer()"> agregado de cheddar y bacon en tus papas</span> 
+                        <span class="text-red-500">+$2.500</span>
+                    </label>
+                </div>
+            </div>
+            <textarea id="nota-item" placeholder="Observaciones..." class="w-full p-3 rounded-xl h-20 outline-none text-sm"></textarea>
+        </div>
+        <div class="drawer-footer">
+            <button id="btn-confirmar-item" onclick="agregarAlCarritoFinal()" class="w-full bg-red-500 text-white py-4 rounded-xl font-black uppercase shadow-lg shadow-red-500/20">Confirmar - $0</button>
+        </div>
+    </div>
+
+    <div id="view-cart" class="view p-6 pt-24 overflow-y-auto h-screen">
+    <h2 class="text-2xl font-black uppercase italic mb-6 text-red-500">Tu Pedido</h2>
+    <div id="items-carrito" class="space-y-4 mb-6"></div>
+    
+    <div id="form-envio" class="space-y-3 hidden">
+        <div class="bg-zinc-900 p-4 rounded-xl mb-4 border border-red-500/20">
+            <p class="text-red-500 font-bold text-lg flex justify-between">Total: <span id="total-final-cart">$0</span></p>
+        </div>
+        
+        <input type="text" id="c-nombre" placeholder="Nombre completo" class="w-full p-4 rounded-xl outline-none">
+        <input type="tel" id="c-whatsapp" placeholder="WhatsApp (Ej: 1122334455)" class="w-full p-4 rounded-xl outline-none">
+        <input type="text" id="c-direccion" placeholder="Dirección de entrega" class="w-full p-4 rounded-xl outline-none">
+        
+        <div class="space-y-2">
+            <p class="text-[10px] font-bold uppercase text-zinc-500 ml-1">Medio de Pago</p>
+            <select id="c-pago" class="w-full p-4 rounded-xl outline-none bg-zinc-900 border border-zinc-700">
+                <option value="Efectivo">💵 Efectivo</option>
+                <option value="Mercado Pago">📱 Mercado Pago</option>
+            </select>
+        </div>
+
+        <button onclick="finalizarPedido()" class="w-full bg-green-600 py-4 rounded-xl font-black uppercase italic mt-4 shadow-lg shadow-green-900/20">
+            Finalizar por WhatsApp
+        </button>
+    </div>
+
+    <div id="cart-vacio-msg" class="text-center py-10 hidden">
+        <i class="fas fa-hamburger text-4xl mb-4 opacity-20"></i>
+        <p class="text-zinc-500 italic">El carrito está vacío</p>
+    </div>
+    <button onclick="navegar('pedido')" class="w-full text-zinc-500 text-[10px] font-bold uppercase p-8">Volver al menú</button>
+</div>
+
+    <div id="view-login" class="view p-6 text-center">
+        <div class="max-w-xs mx-auto pt-20">
+            <h2 class="text-red-500 font-black uppercase mb-6 tracking-widest">Staff Access</h2>
+            <input type="text" id="u" placeholder="Usuario" class="w-full p-4 rounded-xl mb-4 outline-none">
+            <input type="password" id="p" placeholder="Password" class="w-full p-4 rounded-xl mb-4 outline-none">
+            <button onclick="entrarAdmin()" class="w-full bg-red-500 text-white py-4 rounded-xl font-black uppercase">Entrar</button>
+            <button onclick="navegar('home')" class="mt-4 text-xs opacity-50">Cancelar</button>
+        </div>
+    </div>
+
+    <div id="view-admin" class="view p-6 pt-10 overflow-y-auto h-screen">
+        <div class="flex justify-between items-center mb-8">
+            <h2 class="text-red-500 font-black italic text-2xl">VENTAS</h2>
+            <button onclick="navegar('home')" class="bg-zinc-800 px-4 py-2 rounded-lg text-[10px] font-bold">SALIR</button>
+        </div>
+        <div id="lista-ventas" class="space-y-6"></div>
+    </div>
+
+    <div id="ticket-imprimir" class="hidden"></div>
+
+    <script>
+        const PRODUCTOS = [
+            { id: 1, cat: "Hamburguesas", nombre: "Cheese burger", desc: "doble carne con pan de papa y cheddar", precio: 12000, ingredientes: ["doble carne", "pan de papa", "cheddar"] },
+            { id: 2, cat: "Hamburguesas", nombre: "Burger Big", desc: "doble carne, cheddar, salsa Big, lechuga, cebolla y pepino", precio: 13000, ingredientes: ["doble carne","pan de papa", "cheddar", "salsa Big", "lechuga", "cebolla", "pepino"] },
+            { id: 3, cat: "Hamburguesas", nombre: "Bacon Cheese", desc: "doble carne, cheddar, bacon, ketchup y cebolla", precio: 14000, ingredientes: ["doble carne", "pan de papa", "cheddar", "bacon", "ketchup", "cebolla"] },
+            { id: 4, cat: "Hamburguesas", nombre: "Crispy Burger", desc: "doble carne, cheddar, barbacoa, cebolla, crispy y bacon", precio: 14500, ingredientes: ["doble carne", "pan de papa","cheddar", "barbacoa", "cebolla", "crispy", "bacon"] },
+            { id: 5, cat: "Hamburguesas", nombre: "Tasty Burger", desc: "doble carne, lechuga, tomate, cebolla, bacon y salsa atarte", precio: 15000, ingredientes: ["doble carne", "pan de papa", "cheddar", "lechuga", "tomate", "cebolla", "bacon", "salsa atarte"] },
+            { id: 6, cat: "Nuggets y Bastones", nombre: "Nuggets*10", desc:" ", precio: 8000, ingredientes: [] },
+            { id: 7, cat: "Nuggets y Bastones", nombre: "Nuggets*20", desc:" ", precio: 14000, ingredientes: [] },
+            { id: 8, cat: "Nuggets y Bastones", nombre: "Bastones de pollo*10",desc:" ", precio: 8000, ingredientes: [] },
+            { id: 9, cat: "Papas", nombre: "Papas con cheddar medianas",desc:" ", precio: 8000, ingredientes: [] },
+            { id: 10, cat: "Papas", nombre: "Papas con cheddar grandes", desc:" " ,precio: 10000, ingredientes: [] },
+            { id: 11, cat: "Boxes", nombre: "Box 1", desc:"6 nuggets + 6 bastones de pollo" ,precio: 12000, ingredientes: [] },
+            { id: 12, cat: "Boxes", nombre: "Box 2", desc:"12 nuggets + 12 bastones de pollo" ,precio: 19000, ingredientes: [] },
+        ];
+
+        let carrito = JSON.parse(localStorage.getItem('zb_carrito')) || [];
+        let ventas = JSON.parse(localStorage.getItem('zb_ventas')) || [];
+        let itemActual = null;
+        let cantidadDrawer = 1;
+
+        // --- SISTEMA DE ALERTAS PERSONALIZADAS ---
+        function notificar(mensaje, tipo = 'error') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const icon = tipo === 'error' ? 'fa-circle-xmark' : 'fa-circle-check';
+            const color = tipo === 'error' ? 'text-red-500' : 'text-green-500';
+
+            toast.className = `bg-zinc-900 border border-white/10 p-4 rounded-2xl shadow-2xl flex items-center gap-3 transform translate-y-[-20px] opacity-0 transition-all duration-300 pointer-events-auto`;
+            toast.innerHTML = `<i class="fas ${icon} ${color} text-lg"></i><p class="text-white text-[11px] font-bold uppercase tracking-wider">${mensaje}</p>`;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('toast-active'), 10);
+            setTimeout(() => {
+                toast.classList.remove('toast-active');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        let confirmCallback = null;
+        function preguntar(mensaje, callback) {
+            confirmCallback = callback;
+            document.getElementById('confirm-msg').innerText = mensaje;
+            document.getElementById('custom-confirm').classList.replace('hidden', 'flex');
+        }
+
+        function closeConfirm(result) {
+            document.getElementById('custom-confirm').classList.replace('flex', 'hidden');
+            if (result && confirmCallback) confirmCallback();
+        }
+
+        // --- LÓGICA DE HORARIOS ---
+        function estaAbierto() {
+            const ahora = new Date();
+            const dia = ahora.getDay(); 
+            const hora = ahora.getHours();
+            if (dia >= 1 && dia <= 4) return false;
+            if (hora >= 20 && hora < 24) return true;
+            return false;
+        }
+
+        function navegar(id) {
+            if ((id === 'pedido' || id === 'cart') && !estaAbierto()) {
+                notificar("CERRADO. Horario de atención: Viernes a Domingos de 20 a 00hs.");
+                return;
+            }
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById('view-' + id).classList.add('active');
+            document.getElementById('main-nav').style.display = (id === 'home' || id === 'pedido') ? 'block' : 'none';
+            if(id === 'pedido') actualizarTotalBtn();
+        }
+
+        function renderMenu() {
+            const lista = document.getElementById('lista-menu');
+            let currentCat = ""; lista.innerHTML = "";
+            PRODUCTOS.forEach(prod => {
+                if (prod.cat !== currentCat) { currentCat = prod.cat; lista.innerHTML += `<div class="cat-title">${currentCat}</div>`; }
+                lista.innerHTML += `
+                    <div class="burger-card flex justify-between items-center mb-3" onclick="configurarItem(${prod.id})">
+                        <div class="pr-4">
+                            <h3 class="font-black italic uppercase text-sm">${prod.nombre}</h3>
+                            <p class="text-[10px] text-zinc-500 mb-2">${prod.desc}</p>
+                            <p class="text-red-500 font-black">$${prod.precio.toLocaleString()}</p>
+                        </div>
+                        <div class="bg-red-500 text-white min-w-[32px] h-8 rounded-full flex items-center justify-center"><i class="fas fa-plus"></i></div>
+                    </div>`;
+            });
+        }
+
+        function configurarItem(id) {
+            itemActual = PRODUCTOS.find(p => p.id === id);
+            cantidadDrawer = 1;
+            document.getElementById('cant-drawer').innerText = cantidadDrawer;
+            document.getElementById('titulo-drawer').innerText = itemActual.nombre;
+            const listaQuitar = document.getElementById('lista-quitar');
+            listaQuitar.innerHTML = "";
+            document.querySelectorAll('.ex').forEach(e => e.checked = false);
+            document.getElementById('nota-item').value = "";
+            const esHamburguesa = (itemActual.cat === "Hamburguesas");
+            const esBox = (itemActual.cat === "Boxes");
+            const esNuggetBastones = (itemActual.cat === "Nuggets y Bastones");
+            document.getElementById('section-bebida').style.display = (esHamburguesa || esBox) ? 'block' : 'none';
+            document.getElementById('section-salsa').style.display = esNuggetBastones ? 'block' : 'none';
+            document.getElementById('section-extras').style.display = esHamburguesa ? 'block' : 'none';
+            if(esHamburguesa && itemActual.ingredientes && itemActual.ingredientes.length > 0) {
+                document.getElementById('section-quitar').classList.remove('hidden');
+                itemActual.ingredientes.forEach(ing => {
+                    listaQuitar.innerHTML += `<label class="remove-chip cursor-pointer"><input type="checkbox" class="hidden ing-quitar" value="${ing}"><span class="block px-3 py-1 border border-zinc-700 rounded-full text-[10px] uppercase font-bold text-zinc-400 m-1 transition-all">Sin ${ing}</span></label>`;
+                });
+            } else { document.getElementById('section-quitar').classList.add('hidden'); }
+            actualizarPrecioDrawer();
+            document.getElementById('options-drawer').classList.add('show');
+        }
+
+        function cambiarCantidadDrawer(val) {
+            cantidadDrawer = Math.max(1, cantidadDrawer + val);
+            document.getElementById('cant-drawer').innerText = cantidadDrawer;
+            actualizarPrecioDrawer();
+        }
+
+        function cerrarDrawer() { document.getElementById('options-drawer').classList.remove('show'); }
+
+        function actualizarPrecioDrawer() {
+            let base = itemActual.precio;
+            document.querySelectorAll('.ex:checked').forEach(e => base += parseInt(e.dataset.p));
+            let total = base * cantidadDrawer;
+            document.getElementById('btn-confirmar-item').innerText = `Confirmar - $${total.toLocaleString()}`;
+        }
+
+        function agregarAlCarritoFinal() {
+            let extras = []; let quitados = []; let pExtras = 0;
+            document.querySelectorAll('.ex:checked').forEach(e => { extras.push(e.value); pExtras += parseInt(e.dataset.p); });
+            document.querySelectorAll('.ing-quitar:checked').forEach(e => quitados.push(e.value));
+            let det = (itemActual.cat === "Hamburguesas") ? `🥤 ${document.getElementById('sel-bebida').value}` : "";
+            if(quitados.length > 0) det += ` | Sin: ${quitados.join(', ')}`;
+            if(extras.length > 0) det += ` | Extra: ${extras.join(', ')}`;
+            carrito.push({ nombre: itemActual.nombre, cantidad: cantidadDrawer, total: (itemActual.precio + pExtras) * cantidadDrawer, detalles: det, nota: document.getElementById('nota-item').value });
+            localStorage.setItem('zb_carrito', JSON.stringify(carrito));
+            actualizarTotalBtn(); cerrarDrawer();
+            notificar("Agregado al pedido", "success");
+        }
+
+        function actualizarTotalBtn() {
+            const total = carrito.reduce((acc, i) => acc + i.total, 0);
+            document.getElementById('total-flotante').innerText = `$${total.toLocaleString()}`;
+            document.getElementById('btn-carrito-flotante').style.transform = carrito.length > 0 ? "scale(1)" : "scale(0)";
+        }
+
+        function abrirCarrito() {
+            const div = document.getElementById('items-carrito');
+            const form = document.getElementById('form-envio');
+            const msgVacio = document.getElementById('cart-vacio-msg');
+            div.innerHTML = "";
+            if(carrito.length === 0) {
+                msgVacio.classList.remove('hidden'); form.classList.add('hidden');
+            } else {
+                msgVacio.classList.add('hidden'); form.classList.remove('hidden');
+                document.getElementById('total-final-cart').innerText = `$${carrito.reduce((a,b)=>a+b.total,0).toLocaleString()}`;
+                carrito.forEach((i, idx) => {
+                    div.innerHTML += `
+                        <div class="bg-zinc-900 p-4 rounded-xl border border-white/5 flex justify-between items-center">
+                            <div><p class="font-bold text-xs uppercase">${i.cantidad}x ${i.nombre}</p><p class="text-[9px] text-zinc-500">${i.detalles}</p></div>
+                            <div class="text-right"><p class="text-red-500 font-bold">$${i.total.toLocaleString()}</p><button onclick="borrarItem(${idx})" class="text-red-500 text-[10px] font-bold uppercase tracking-tighter">Quitar</button></div>
+                        </div>`;
+                });
+            }
+            navegar('cart');
+        }
+
+        function borrarItem(idx) { 
+            carrito.splice(idx, 1); 
+            localStorage.setItem('zb_carrito', JSON.stringify(carrito));
+            actualizarTotalBtn(); abrirCarrito(); 
+        }
+
+        function finalizarPedido() {
+    const n = document.getElementById('c-nombre').value, 
+          w = document.getElementById('c-whatsapp').value.trim(), 
+          d = document.getElementById('c-direccion').value,
+          pago = document.getElementById('c-pago').value; 
+
+    if(!n || !w || !d || carrito.length === 0) return notificar("Completa todos tus datos");
+    
+    const soloNumeros = /^\d+$/;
+    if (!soloNumeros.test(w) || w.length < 10) return notificar("WhatsApp inválido");
+
+    const totalPedido = carrito.reduce((acc, i) => acc + i.total, 0);
+    
+    // Guardar en el historial de ventas (Staff)
+    const nuevoPedido = { 
+        id: Date.now(), 
+        cliente: n, 
+        whatsapp: w, 
+        direccion: d, 
+        pago: pago,
+        items: [...carrito], 
+        total: totalPedido, 
+        estado: 'Pendiente', 
+        fecha: new Date().toLocaleString() 
+    };
+
+    
+    
+    ventas.unshift(nuevoPedido);
+    localStorage.setItem('zb_ventas', JSON.stringify(ventas));
+
+    // Formatear mensaje para WhatsApp
+    let texto = `*ZONA BURGER - NUEVO PEDIDO*%0A` +
+                `*Cliente:* ${n}%0A` +
+                `*Dirección:* ${d}%0A` +
+                `*Pago:* ${pago}%0A%0A` + // Se añade al mensaje
+                carrito.map(i => `• ${i.cantidad}x ${i.nombre} (${i.detalles})`).join('%0A') + 
+                `%0A%0A*TOTAL: $${totalPedido.toLocaleString()}*`;
+    
+    const MI_NUMERO = "1152617656"; 
+    window.open(`https://wa.me/549${MI_NUMERO}?text=${texto}`);
+
+
+
+    
+    // Limpiar carrito y resetear
+    carrito = []; 
+    localStorage.removeItem('zb_carrito');
+    actualizarTotalBtn(); 
+    navegar('home');
+    notificar("¡Pedido enviado con éxito!", "success");
+}
+
+        function entrarAdmin() {
+            if(document.getElementById('u').value === 'mathias' && document.getElementById('p').value === 'zonaburger122') { 
+                renderVentas(); navegar('admin'); 
+            } else {
+                notificar("Acceso denegado");
+            }
+        }
+
+        function renderVentas() {
+            const div = document.getElementById('lista-ventas');
+            div.innerHTML = ventas.length === 0 ? "<p class='text-center opacity-50 pt-20'>Sin ventas</p>" : "";
+            ventas.forEach((v, idx) => {
+                div.innerHTML += `
+                <div class="bg-zinc-900 p-6 rounded-3xl border border-white/10 mb-4">
+                    <div class="flex justify-between items-start mb-2">
+                        <h3 class="font-black uppercase text-red-500">${v.cliente}</h3>
+                        <span class="font-black text-green-500">$${v.total.toLocaleString()}</span>
+                    </div>
+                    <div class="text-[10px] text-zinc-300 mb-4 space-y-1">
+                        ${v.items.map(i => `<div>• <b>${i.cantidad}x ${i.nombre}</b> - ${i.detalles}</div>`).join('')}
+                    </div>
+                    <div class="flex flex-wrap gap-2">
+                        <select onchange="cambiarEstado(${idx}, this.value)" class="flex-1 text-[10px] font-bold p-3 uppercase rounded-xl bg-black">
+                            <option value="Pendiente" ${v.estado==='Pendiente'?'selected':''}>⏳ Pendiente</option>
+                            <option value="En Cocina" ${v.estado==='En Cocina'?'selected':''}>🔥 En Cocina</option>
+                            <option value="Listo" ${v.estado==='Listo'?'selected':''}>✅ Listo</option>
+                        </select>
+                        <button onclick="imprimirTicket(${idx})" class="bg-white text-black px-4 rounded-xl text-[10px] font-bold">TICKET</button>
+                        <button onclick="borrarVenta(${idx})" class="text-red-500 p-2"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>`;
+            });
+        }
+
+        function imprimirTicket(idx) {
+            const v = ventas[idx];
+            const area = document.getElementById('ticket-imprimir');
+            area.innerHTML = `<div style="color: black; background: white; padding: 20px; font-family: monospace; width: 300px;">
+                <h2 style="text-align:center; margin:0">ZONA BURGER</h2><p style="text-align:center; font-size:10px">${v.fecha}</p><hr>
+                <p><b>CLIENTE:</b> ${v.cliente}<br><b>DIR:</b> ${v.direccion}</p><hr>
+                ${v.items.map(i => `<p>${i.cantidad}x ${i.nombre}<br><small>${i.detalles}</small><br><b>$${i.total.toLocaleString()}</b></p>`).join('')}
+                <hr><h3 style="text-align:right">TOTAL: $${v.total.toLocaleString()}</h3></div>`;
+            area.classList.remove('hidden'); window.print(); area.classList.add('hidden');
+        }
+
+        function cambiarEstado(idx, est) { 
+            ventas[idx].estado = est; 
+            localStorage.setItem('zb_ventas', JSON.stringify(ventas)); 
+            const v = ventas[idx];
+            const mensaje = `*ZONA BURGER*%0AHola ${v.cliente}, tu pedido ha cambiado de estado: *${est}* 🍔🔥`;
+            window.open(`https://wa.me/549${v.whatsapp}?text=${mensaje}`);
+            renderVentas(); 
+            notificar("Estado actualizado", "success");
+        }
+
+        function borrarVenta(idx) { 
+            preguntar("¿Deseas eliminar este registro de venta de forma permanente?", () => {
+                ventas.splice(idx,1); 
+                localStorage.setItem('zb_ventas', JSON.stringify(ventas)); 
+                renderVentas(); 
+                notificar("Venta eliminada", "success");
+            });
+        }
+
+        window.onload = () => {
+            if (!estaAbierto()) {
+                const btn = document.getElementById('btn-hacer-pedido-home');
+                btn.classList.replace('bg-red-500', 'bg-zinc-800');
+                btn.innerText = "Hacer pedido";
+            }
+        };
+
+        renderMenu();
+        actualizarTotalBtn();
+    </script>
+</body>
+</html>
